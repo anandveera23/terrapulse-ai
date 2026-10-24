@@ -14,10 +14,12 @@ from rasterio.transform import from_origin
 
 from src.change_detection.classifier import classify_dndvi
 from src.change_detection.differencing import compute_dndvi
+from src.data.sample_loader import load_sample_pair
 from src.data.sentinel_loader import load_sentinel_geotiff
 from src.geospatial.area_calc import compute_change_area_statistics
 from src.indices.vegetation import calculate_ndvi, calculate_ndwi
 from src.preprocessing.cloud_mask import apply_scl_mask
+from src.preprocessing.reproject import align_and_match_rasters
 
 
 def test_synthetic_raster_end_to_end_audit():
@@ -188,3 +190,100 @@ def test_nodata_sentinel_geotiff_handling():
 
     # Other pixels should be valid reflectance (1000 / 10000 = 0.10)
     assert pytest.approx(scene.nir[1, 1], abs=1e-4) == 0.10
+
+
+def test_rondonia_sample_exact_numerical_consistency():
+    """Verify exact numerical consistency of the Rondônia sample benchmark."""
+    scene1, scene2, _meta = load_sample_pair("Rondônia, Brazil (Deforestation Front)")
+
+    arr1 = np.stack([scene1.blue, scene1.green, scene1.red, scene1.nir])
+    arr2 = np.stack([scene2.blue, scene2.green, scene2.red, scene2.nir])
+    aligned1, aligned2, unified_profile = align_and_match_rasters(
+        arr1, scene1.profile, arr2, scene2.profile
+    )
+
+    assert unified_profile["crs"] == "EPSG:32720"
+    assert unified_profile["width"] == 180
+    assert unified_profile["height"] == 180
+
+    mask1, _ = apply_scl_mask(scene1.scl)
+    mask2, _ = apply_scl_mask(scene2.scl)
+    ndwi1 = calculate_ndwi(aligned1[1], aligned1[3])
+    ndwi2 = calculate_ndwi(aligned2[1], aligned2[3])
+    water_mask = (ndwi1 > 0.05) | (ndwi2 > 0.05)
+
+    ndvi1, stats1 = calculate_ndvi(aligned1[3], aligned1[2], valid_mask=mask1)
+    ndvi2, stats2 = calculate_ndvi(aligned2[3], aligned2[2], valid_mask=mask2)
+
+    # T1 Mean NDVI in rainforest range (~0.77 - 0.78)
+    assert pytest.approx(stats1["mean"], abs=0.02) == 0.774
+    assert stats1["valid_percentage"] == 100.0
+
+    # T2 Mean NDVI drop due to clearing (~0.49 - 0.51)
+    assert pytest.approx(stats2["mean"], abs=0.02) == 0.498
+    assert pytest.approx(stats2["valid_percentage"], abs=0.5) == 99.2
+
+    dndvi, _dndvi_stats = compute_dndvi(
+        ndvi1, ndvi2, valid_mask_t1=mask1, valid_mask_t2=mask2, water_mask=water_mask
+    )
+    _classes, counts = classify_dndvi(dndvi)
+    _stats_df, summary = compute_change_area_statistics(counts, unified_profile)
+
+    # 180 x 180 @ 10m = 324.0 ha total scene
+    assert summary["total_study_ha"] == 324.0
+
+    # 30,883 valid joint canopy pixels = 308.83 ha (displays as 308.8 ha)
+    assert pytest.approx(summary["total_valid_ha"], abs=0.1) == 308.8
+    # 95.3% coverage
+    assert pytest.approx(summary["valid_coverage_pct"], abs=0.1) == 95.3
+
+    # Losses and net balance
+    assert summary["total_loss_ha"] > 90.0
+    assert summary["total_gain_ha"] == 0.0
+    # Net balance is negative
+    assert summary["net_change_ha"] == -summary["total_loss_ha"]
+    assert pytest.approx(summary["net_change_ha"], abs=0.5) == -98.5
+
+
+def test_mau_forest_sample_exact_numerical_consistency():
+    """Verify exact numerical consistency and gain inclusion for the Mau Forest benchmark."""
+    scene1, scene2, _meta = load_sample_pair("Mau Forest Complex, Kenya (Canopy Loss & Recovery)")
+
+    arr1 = np.stack([scene1.blue, scene1.green, scene1.red, scene1.nir])
+    arr2 = np.stack([scene2.blue, scene2.green, scene2.red, scene2.nir])
+    aligned1, aligned2, unified_profile = align_and_match_rasters(
+        arr1, scene1.profile, arr2, scene2.profile
+    )
+
+    assert unified_profile["crs"] == "EPSG:32736"
+    assert unified_profile["width"] == 160
+    assert unified_profile["height"] == 160
+
+    mask1, _ = apply_scl_mask(scene1.scl)
+    mask2, _ = apply_scl_mask(scene2.scl)
+    ndwi1 = calculate_ndwi(aligned1[1], aligned1[3])
+    ndwi2 = calculate_ndwi(aligned2[1], aligned2[3])
+    water_mask = (ndwi1 > 0.05) | (ndwi2 > 0.05)
+
+    ndvi1, _stats1 = calculate_ndvi(aligned1[3], aligned1[2], valid_mask=mask1)
+    ndvi2, _stats2 = calculate_ndvi(aligned2[3], aligned2[2], valid_mask=mask2)
+
+    dndvi, _ = compute_dndvi(
+        ndvi1, ndvi2, valid_mask_t1=mask1, valid_mask_t2=mask2, water_mask=water_mask
+    )
+    _classes, counts = classify_dndvi(dndvi)
+    _stats_df, summary = compute_change_area_statistics(counts, unified_profile)
+
+    # Total area: 160 x 160 @ 10m = 256.0 ha
+    assert summary["total_study_ha"] == 256.0
+    assert summary["total_valid_ha"] == 256.0
+    assert summary["valid_coverage_pct"] == 100.0
+
+    # Mau Forest exhibits both canopy loss and regrowth/reforestation
+    assert summary["total_loss_ha"] > 0.0
+    assert summary["total_gain_ha"] > 0.0
+
+    # Net balance mathematically equals gain minus loss
+    expected_net = round(summary["total_gain_ha"] - summary["total_loss_ha"], 2)
+    assert summary["net_change_ha"] == expected_net
+
