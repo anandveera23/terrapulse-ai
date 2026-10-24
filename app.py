@@ -66,17 +66,24 @@ def load_and_process_scenes(
     """Load, align, mask, and compute indices for observation pair."""
     if region_selection == "Custom GeoTIFF Upload":
         if t1_upload_bytes is None or t2_upload_bytes is None:
-            return None
-        scene_t1 = load_sentinel_geotiff(
-            io.BytesIO(t1_upload_bytes),
-            acquisition_date="Uploaded T1",
-            region_name="Custom Upload",
-        )
-        scene_t2 = load_sentinel_geotiff(
-            io.BytesIO(t2_upload_bytes),
-            acquisition_date="Uploaded T2",
-            region_name="Custom Upload",
-        )
+            return {"status": "awaiting_upload"}
+        try:
+            scene_t1 = load_sentinel_geotiff(
+                io.BytesIO(t1_upload_bytes),
+                acquisition_date="Uploaded T1",
+                region_name="Custom Upload",
+            )
+            scene_t2 = load_sentinel_geotiff(
+                io.BytesIO(t2_upload_bytes),
+                acquisition_date="Uploaded T2",
+                region_name="Custom Upload",
+            )
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "status": "error",
+                "title": "Custom GeoTIFF Validation Error",
+                "message": f"Failed to parse uploaded GeoTIFF files: {exc}. Please ensure both files contain valid multispectral imagery (at least 2 bands) and spatial coordinate bounds.",
+            }
         meta_info = {
             "description": "User uploaded multispectral GeoTIFF observation pair.",
             "region_name": "Custom Upload",
@@ -86,7 +93,20 @@ def load_and_process_scenes(
             "utm_crs": str(scene_t1.crs),
         }
     else:
-        scene_t1, scene_t2, meta_info = load_sample_pair(region_selection)
+        try:
+            scene_t1, scene_t2, meta_info = load_sample_pair(region_selection)
+        except FileNotFoundError as fnf:
+            return {
+                "status": "unavailable",
+                "title": "Satellite Imagery Unavailable",
+                "message": str(fnf),
+            }
+        except KeyError as kerr:
+            return {
+                "status": "error",
+                "title": "Unknown Study Region",
+                "message": str(kerr),
+            }
 
     # 1. Spatial Alignment and Grid Matching
     # Align T2 to T1 grid if profiles differ
@@ -144,6 +164,7 @@ def load_and_process_scenes(
     )
 
     return {
+        "status": "success",
         "scene_t1": updated_t1,
         "scene_t2": updated_t2,
         "profile": unified_profile,
@@ -215,13 +236,24 @@ pipeline_data = load_and_process_scenes(
     t2_upload_bytes=t2_bytes,
 )
 
-if pipeline_data is None:
+if pipeline_data.get("status") == "awaiting_upload":
     render_brand_header(
-        title="Custom Upload Mode",
+        title="Custom GeoTIFF Upload Mode",
         subtitle="Please upload both Baseline (T1) and Follow-up (T2) GeoTIFF files in the left sidebar.",
         badge="Awaiting Input",
     )
-    st.warning("Awaiting GeoTIFF uploads. Please select files from your computer or switch back to a curated sample region.")
+    st.info("ℹ️ **Awaiting GeoTIFF uploads:** Please upload two multispectral GeoTIFF files in the sidebar (B02/B03/B04/B08/SCL) or select a pre-configured study region.")
+    st.stop()
+
+if pipeline_data.get("status") in ("unavailable", "error"):
+    title = pipeline_data.get("title", "Satellite Data Issue")
+    badge = "Unavailable" if pipeline_data.get("status") == "unavailable" else "Validation Error"
+    render_brand_header(
+        title=title,
+        subtitle="The requested satellite data could not be processed.",
+        badge=badge,
+    )
+    st.warning(f"⚠️ **{title}:** {pipeline_data.get('message')}")
     st.stop()
 
 # Extract processed artifacts
@@ -290,7 +322,10 @@ if navigation == "1. Overview":
             trend_color="#2A9D8F",
         )
 
-    st.caption("ℹ️ **Coverage Audit Note:** T1 (100.0%) and T2 (99.2%) report single-date cloud-free surface. Overall 95.0% coverage represents joint cloud-free canopy after excluding permanent water bodies (NDWI > 0.05) and multi-temporal clouds/shadows.")
+    st.caption(
+        f"ℹ️ **Coverage Audit Note:** T1 ({stats_t1['valid_percentage']:.1f}%) and T2 ({stats_t2['valid_percentage']:.1f}%) report single-date cloud-free surface. "
+        f"Overall {default_summary['valid_coverage_pct']:.1f}% coverage represents joint cloud-free canopy after excluding permanent water bodies (NDWI > 0.05) and multi-temporal clouds/shadows."
+    )
     st.markdown("<br>", unsafe_allow_html=True)
 
     # Before and After Visual Comparison
