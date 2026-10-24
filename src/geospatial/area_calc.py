@@ -67,22 +67,35 @@ def compute_change_area_statistics(
     """
     pixel_area_sqm = get_pixel_area_sqm(profile)
 
-    records = []
+    # Compute exact unrounded area values directly from pixel counts
+    n_severe = pixel_counts.get(1, 0)
+    n_mod_loss = pixel_counts.get(2, 0)
+    n_stable = pixel_counts.get(3, 0)
+    n_mod_gain = pixel_counts.get(4, 0)
+    n_sig_gain = pixel_counts.get(5, 0)
+
+    severe_loss_ha = (n_severe * pixel_area_sqm) / 10000.0
+    moderate_loss_ha = (n_mod_loss * pixel_area_sqm) / 10000.0
+    loss_ha = ((n_severe + n_mod_loss) * pixel_area_sqm) / 10000.0
+    gain_ha = ((n_mod_gain + n_sig_gain) * pixel_area_sqm) / 10000.0
+    stable_ha = (n_stable * pixel_area_sqm) / 10000.0
+    net_change_ha = gain_ha - loss_ha
+
     # Total valid pixels (classes 1 to 5, excluding 0)
     valid_pixels = sum(pixel_counts.get(cid, 0) for cid in range(1, 6))
     total_pixels = sum(pixel_counts.values())
 
+    total_valid_ha = (valid_pixels * pixel_area_sqm) / 10000.0
+    total_study_ha = (total_pixels * pixel_area_sqm) / 10000.0
+
+    records = []
     for cid in [1, 2, 3, 4, 5, 0]:
         count = pixel_counts.get(cid, 0)
         area_ha = (count * pixel_area_sqm) / 10000.0
         area_km2 = area_ha / 100.0
 
-        if cid != 0 and valid_pixels > 0:
-            share_pct = (count / valid_pixels) * 100.0
-        elif cid == 0 and total_pixels > 0:
-            share_pct = (count / total_pixels) * 100.0
-        else:
-            share_pct = 0.0
+        share_valid = (count / valid_pixels * 100.0) if (cid != 0 and valid_pixels > 0) else 0.0
+        share_scene = (count / total_pixels * 100.0) if total_pixels > 0 else 0.0
 
         meta = CHANGE_CLASSES.get(cid, {})
         records.append(
@@ -92,36 +105,26 @@ def compute_change_area_statistics(
                 "Pixel Count": count,
                 "Area (ha)": round(area_ha, 2),
                 "Area (km²)": round(area_km2, 4),
-                "Share (%)": round(share_pct, 2),
+                "Share (%)": round(share_valid if cid != 0 else share_scene, 2),
+                "Share of Valid (%)": round(share_valid, 2),
+                "Share of Scene (%)": round(share_scene, 2),
                 "Color": meta.get("color", "#CCCCCC"),
             }
         )
 
     stats_df = pd.DataFrame(records)
 
-    # Calculate net canopy change: (Gains) - (Losses)
-    loss_ha = stats_df[stats_df["Class ID"].isin([1, 2])]["Area (ha)"].sum()
-    gain_ha = stats_df[stats_df["Class ID"].isin([4, 5])]["Area (ha)"].sum()
-    net_change_ha = gain_ha - loss_ha
-
-    severe_loss_ha = stats_df[stats_df["Class ID"] == 1]["Area (ha)"].sum()
-    moderate_loss_ha = stats_df[stats_df["Class ID"] == 2]["Area (ha)"].sum()
-    stable_ha = stats_df[stats_df["Class ID"] == 3]["Area (ha)"].sum()
-
-    total_valid_ha = (valid_pixels * pixel_area_sqm) / 10000.0
-    total_study_ha = (total_pixels * pixel_area_sqm) / 10000.0
-
     summary_metrics = {
         "pixel_area_sqm": pixel_area_sqm,
-        "total_study_ha": total_study_ha,
-        "total_valid_ha": total_valid_ha,
+        "total_study_ha": round(total_study_ha, 2),
+        "total_valid_ha": round(total_valid_ha, 2),
         "valid_coverage_pct": (valid_pixels / total_pixels * 100.0) if total_pixels > 0 else 0.0,
-        "severe_loss_ha": severe_loss_ha,
-        "moderate_loss_ha": moderate_loss_ha,
-        "total_loss_ha": loss_ha,
-        "total_gain_ha": gain_ha,
-        "stable_ha": stable_ha,
-        "net_change_ha": net_change_ha,
+        "severe_loss_ha": round(severe_loss_ha, 2),
+        "moderate_loss_ha": round(moderate_loss_ha, 2),
+        "total_loss_ha": round(loss_ha, 2),
+        "total_gain_ha": round(gain_ha, 2),
+        "stable_ha": round(stable_ha, 2),
+        "net_change_ha": round(net_change_ha, 2),
     }
 
     return stats_df, summary_metrics

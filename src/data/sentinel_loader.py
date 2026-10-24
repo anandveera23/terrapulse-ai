@@ -118,11 +118,25 @@ def load_sentinel_geotiff(
         # Scale Digital Numbers (DN) to surface reflectance [0.0 - 1.0]
         # Sentinel-2 L2A BOA reflectance = DN / 10000.0
         data_f = data.astype(np.float32)
+
+        # Explicit nodata handling: convert sentinel nodata values to NaN
+        if dataset.nodata is not None:
+            nodata_val = dataset.nodata
+            if np.isnan(nodata_val):
+                nodata_mask = np.isnan(data)
+            else:
+                nodata_mask = (data == nodata_val)
+            data_f[nodata_mask] = np.nan
+        else:
+            nodata_mask = None
+
         scl_band = None
 
         if band_count >= 5:
             # 5th band is SCL (discrete integers 0-11, do not divide)
             scl_band = data[4].astype(np.int32)
+            if nodata_mask is not None and nodata_mask.shape[0] >= 5:
+                scl_band[nodata_mask[4]] = 0  # 0 = NO_DATA in SCL
             for b in range(4):
                 if np.nanmax(data_f[b]) > 2.0:
                     data_f[b] /= 10000.0

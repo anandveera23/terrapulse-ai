@@ -61,6 +61,8 @@ def align_and_match_rasters(
             dst_transform=dst_transform,
             dst_crs=dst_crs,
             resampling=resampling_method,
+            src_nodata=np.nan,
+            dst_nodata=np.nan,
         )
     elif array2.ndim == 3:
         num_bands = array2.shape[0]
@@ -74,6 +76,8 @@ def align_and_match_rasters(
                 dst_transform=dst_transform,
                 dst_crs=dst_crs,
                 resampling=resampling_method,
+                src_nodata=np.nan,
+                dst_nodata=np.nan,
             )
     else:
         raise ValueError(f"Unsupported array dimension: {array2.ndim}")

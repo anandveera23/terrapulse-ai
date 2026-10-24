@@ -288,10 +288,11 @@ if navigation == "1. Overview":
         render_kpi_card(
             label="Valid Pixel Coverage",
             value=f"{default_summary['valid_coverage_pct']:.1f}%",
-            subtext=f"{default_summary['total_valid_ha']:,.1f} ha clear area",
+            subtext=f"{default_summary['total_valid_ha']:,.1f} ha (joint canopy)",
             trend_color="#2A9D8F",
         )
 
+    st.caption("ℹ️ **Coverage Audit Note:** T1 (100.0%) and T2 (99.2%) report single-date cloud-free surface. Overall 95.0% coverage represents joint cloud-free canopy after excluding permanent water bodies (NDWI > 0.05) and multi-temporal clouds/shadows.")
     st.markdown("<br>", unsafe_allow_html=True)
 
     # Before and After Visual Comparison
@@ -489,7 +490,7 @@ elif navigation == "3. Change Detection":
     with cd_stats_col:
         st.markdown("#### 📊 Area Breakdown by Category")
         st.dataframe(
-            active_stats_df[["Category", "Pixel Count", "Area (ha)", "Area (km²)", "Share (%)"]],
+            active_stats_df[["Category", "Pixel Count", "Area (ha)", "Area (km²)", "Share of Valid (%)", "Share of Scene (%)"]],
             hide_index=True,
             use_container_width=True,
         )
@@ -712,11 +713,25 @@ elif navigation == "5. Methodology":
         ### 4. Crucial Distinction: Vegetation Decline vs Confirmed Deforestation
         A fundamental tenet of responsible geospatial data science is recognizing the boundaries of multispectral optical indices:
         
-        1. **Vegetation Decline $\\ne$ Verified Deforestation:** An NDVI drop represents a reduction in canopy photosynthetic activity.
+        1. **Vegetation Decline $\ne$ Verified Deforestation:** An NDVI drop represents a reduction in canopy photosynthetic activity.
            Common confounding factors include seasonal deciduous leaf fall, localized droughts, crop harvest cycles, and agricultural fallow periods.
         2. **Cloud & Shadow Contamination:** Unmasked sub-pixel cloud shadows depress NIR reflectance, creating false-positive loss signatures.
         3. **Need for Secondary Verification:** True operational deforestation alerting requires cross-validation with Synthetic Aperture Radar (SAR, e.g. Sentinel-1 C-band) 
            or on-the-ground field verification.
+        """
+    )
+
+    st.markdown("---")
+    st.markdown(
+        """
+        ### 5. Multi-Temporal Valid Coverage Formulation
+        Users often observe that individual single-observation clear percentages (e.g., T1 = 100.0%, T2 = 99.2%) differ from 
+        the overall change detection coverage (95.0%). This difference is mathematically rigorous and intentional:
+        
+        $$\\text{Coverage}_{\\text{joint}} = \\frac{|\\text{Valid}_{T1} \\cap \\text{Valid}_{T2} \\setminus \\text{Permanent Water}|}{\\text{Total Scene Pixels}}$$
+        
+        - **Single-Date Validity:** Measures whether the satellite sensor captured a cloud-free surface (land OR water). Water surfaces are valid measurements for individual NDVI maps.
+        - **Joint Change Detection Coverage:** Multi-temporal canopy differencing requires clear observations on **both** observation dates AND excludes permanent water bodies (NDWI > 0.05). This prevents seasonal river stage fluctuations or meandering from producing false-positive canopy loss alerts.
         """
     )
 
@@ -737,18 +752,18 @@ elif navigation == "6. About the Project":
         **TerraPulse AI** is a data science and geospatial software engineering platform built to monitor, 
         estimate, and visualize environmental canopy dynamics using open-access Copernicus Sentinel-2 multispectral imagery.
 
+        ### 🛰️ Data Provenance & Sample Datasets
+        - **Sample Datasets:** The pre-packaged Rondônia and Mau Forest datasets are realistic, synthetic Sentinel-2 sample models with authentic UTM georeferencing (EPSG:32720 and EPSG:32736), 10 m pixel resolution, and genuine spectral signatures. They allow instant, lightweight, and self-contained demonstration on student laptops and cloud platforms without multi-gigabyte downloads.
+        - **Custom GeoTIFF Support:** The application fully supports user uploads of genuine multispectral Sentinel-2 GeoTIFF files (Bands 2, 3, 4, 8, and optional SCL).
+
         ### 🛠️ Architecture & Engineering Stack
         - **Geospatial Processing:** `Rasterio`, `GDAL`, `GeoPandas`, `Shapely`, `PyProj`
         - **Numerical & Data Science:** `NumPy`, `Pandas`, `Scikit-Learn` (Random Forest Classifier)
         - **Interactive UI & Visualizations:** `Streamlit`, `Folium`, `Streamlit-Folium`, `Plotly`
         - **Automated Reporting:** `ReportLab` (Vector PDF Engine)
-        - **Testing & Quality Assurance:** `pytest` (15 automated unit & integration tests), `Ruff` linter
+        - **Testing & Quality Assurance:** `pytest` (23 automated unit & integration tests), `Ruff` linter
         - **Deployment & CI/CD:** GitHub Actions continuous integration, Streamlit Community Cloud
-
-        ### 📌 Key Capabilities
-        - **Zero-Denominator Protected Mathematics:** Strict validation prevents numeric instability over satellite rasters.
-        - **Dual Coordinate System Aware Area Calculations:** Supports both projected UTM planar metrics and WGS84 geodesic ellipsoid calculations.
-        - **Self-Contained & Reproducible:** Includes high-fidelity Sentinel-2 sample datasets for Rondônia (Brazil) and Mau Forest (Kenya).
-        - **No Vendor Lock-in or Hardcoded Paths:** 100% portable, lightweight, and runnable on a student laptop or cloud container.
+        """
+    )coded Paths:** 100% portable, lightweight, and runnable on a student laptop or cloud container.
         """
     )
