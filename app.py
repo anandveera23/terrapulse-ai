@@ -5,8 +5,11 @@ vegetation index estimation, land-cover dynamics, and environmental reporting.
 """
 
 import io
+
+import folium
 import numpy as np
-import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 from streamlit_folium import st_folium
 
@@ -16,13 +19,12 @@ from src.change_detection.classifier import (
     create_change_rgba,
 )
 from src.change_detection.differencing import compute_dndvi
-from src.change_detection.land_cover import LandCoverBaselineModel, LAND_COVER_CLASSES
+from src.change_detection.land_cover import LAND_COVER_CLASSES, LandCoverBaselineModel
 from src.data.sample_loader import (
-    SAMPLE_CATALOGUE,
     get_available_sample_regions,
     load_sample_pair,
 )
-from src.data.sentinel_loader import load_sentinel_geotiff, SentinelScene
+from src.data.sentinel_loader import SentinelScene, load_sentinel_geotiff
 from src.geospatial.area_calc import compute_change_area_statistics
 from src.indices.vegetation import calculate_ndvi, calculate_ndwi
 from src.preprocessing.cloud_mask import apply_scl_mask, detect_clouds_fallback
@@ -58,8 +60,8 @@ def load_and_process_scenes(
     region_selection: str,
     enable_cloud_mask: bool = True,
     exclude_water: bool = True,
-    t1_upload_bytes: bytes = None,
-    t2_upload_bytes: bytes = None,
+    t1_upload_bytes: bytes | None = None,
+    t2_upload_bytes: bytes | None = None,
 ):
     """Load, align, mask, and compute indices for observation pair."""
     if region_selection == "Custom GeoTIFF Upload":
@@ -365,10 +367,10 @@ elif navigation == "2. Satellite Explorer":
         st.markdown("---")
         st.markdown("#### 📋 Scene Metadata")
         st.markdown(f"**Acquisition Date:** `{chosen_scene.acquisition_date}`")
-        st.markdown(f"**Sensor:** `Sentinel-2 MSI (Level-2A)`")
+        st.markdown("**Sensor:** `Sentinel-2 MSI (Level-2A)`")
         st.markdown(f"**Raster Dimensions:** `{chosen_scene.width} × {chosen_scene.height} px`")
         st.markdown(f"**CRS:** `{profile.get('crs')}`")
-        st.markdown(f"**Spatial Resolution:** `10.0 m / px`")
+        st.markdown("**Spatial Resolution:** `10.0 m / px`")
         st.markdown(f"**Cloud Cover (SCL):** `{chosen_qual.get('cloud_pct', 0.0):.1f}%`")
         st.markdown(f"**Clear Valid Surface:** `{chosen_stats['valid_percentage']:.1f}%`")
         st.markdown(f"**Mean NDVI:** `{chosen_stats['mean']:.3f}`")
@@ -412,10 +414,10 @@ elif navigation == "2. Satellite Explorer":
             barmode="overlay",
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(19,35,27,0.4)",
-            font=dict(family="Inter, sans-serif", color="#F0F5F2", size=12),
-            xaxis=dict(title="Surface Reflectance (0.0 to 1.0)", gridcolor="rgba(255,255,255,0.08)"),
-            yaxis=dict(title="Pixel Count", gridcolor="rgba(255,255,255,0.08)"),
-            legend=dict(orientation="h", y=1.05),
+            font={"family": "Inter, sans-serif", "color": "#F0F5F2", "size": 12},
+            xaxis={"title": "Surface Reflectance (0.0 to 1.0)", "gridcolor": "rgba(255,255,255,0.08)"},
+            yaxis={"title": "Pixel Count", "gridcolor": "rgba(255,255,255,0.08)"},
+            legend={"orientation": "h", "y": 1.05},
             height=320,
         )
         st.plotly_chart(fig_bands, use_container_width=True)
@@ -446,7 +448,7 @@ elif navigation == "2. Satellite Explorer":
 elif navigation == "3. Change Detection":
     render_brand_header(
         title="Vegetation Change Detection",
-        subtitle=f"Differential dNDVI Differencing, Classification Thresholds, and Land-Cover Transition Modeling",
+        subtitle="Differential dNDVI Differencing, Classification Thresholds, and Land-Cover Transition Modeling",
         badge="Analytical Core",
     )
 
@@ -549,7 +551,7 @@ elif navigation == "3. Change Detection":
                 fig_fi.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(19,35,27,0.4)",
-                    font=dict(family="Inter, sans-serif", color="#F0F5F2", size=12),
+                    font={"family": "Inter, sans-serif", "color": "#F0F5F2", "size": 12},
                     height=380,
                     showlegend=False,
                 )
@@ -763,7 +765,11 @@ elif navigation == "6. About the Project":
         - **Automated Reporting:** `ReportLab` (Vector PDF Engine)
         - **Testing & Quality Assurance:** `pytest` (23 automated unit & integration tests), `Ruff` linter
         - **Deployment & CI/CD:** GitHub Actions continuous integration, Streamlit Community Cloud
-        """
-    )coded Paths:** 100% portable, lightweight, and runnable on a student laptop or cloud container.
+
+        ### 📌 Key Capabilities
+        - **Zero-Denominator Protected Mathematics:** Strict validation prevents numeric instability over satellite rasters.
+        - **Dual Coordinate System Aware Area Calculations:** Supports both projected UTM planar metrics and WGS84 geodesic ellipsoid calculations.
+        - **Self-Contained & Reproducible:** Includes high-fidelity Sentinel-2 sample datasets for Rondônia (Brazil) and Mau Forest (Kenya).
+        - **No Vendor Lock-in or Hardcoded Paths:** 100% portable, lightweight, and runnable on a student laptop or cloud container.
         """
     )
