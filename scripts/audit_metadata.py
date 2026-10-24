@@ -1,5 +1,6 @@
-import rasterio
 from pathlib import Path
+
+import rasterio
 
 sample_dir = Path("data/sample")
 for p in sorted(sample_dir.glob("*.tif")):

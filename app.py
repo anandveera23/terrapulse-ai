@@ -254,11 +254,7 @@ if navigation == "1. Overview":
     )
 
     st.markdown(
-        f"""
-        <div class="tp-callout">
-            <b>Region Focus:</b> {meta['description']}
-        </div>
-        """,
+        f'<div class="tp-callout"><b>Region Focus:</b> {meta["description"]}</div>',
         unsafe_allow_html=True,
     )
 
@@ -331,13 +327,11 @@ if navigation == "1. Overview":
         st.plotly_chart(fig_bar, use_container_width=True)
 
     st.markdown(
-        """
-        <div class="tp-callout tp-callout-warning">
-            <b>Scientific Caveat:</b> NDVI declines reflect decreased vegetative greenness or canopy disturbance, 
-            which may stem from agricultural crop harvesting, seasonal drought, or logging. Never cite satellite 
-            indices as legally confirmed deforestation without field or SAR verification.
-        </div>
-        """,
+        '<div class="tp-callout tp-callout-warning">'
+        '<b>Scientific Caveat:</b> NDVI declines reflect decreased vegetative greenness or canopy disturbance, '
+        'which may stem from agricultural crop harvesting, seasonal drought, or logging. Never cite satellite '
+        'indices as legally confirmed deforestation without field or SAR verification.'
+        '</div>',
         unsafe_allow_html=True,
     )
 
@@ -424,20 +418,18 @@ elif navigation == "2. Satellite Explorer":
 
     with b_col2:
         st.markdown(
-            """
-            <div class="tp-card" style="margin-top: 25px;">
-                <h4 style="color: #2A9D8F; margin-top: 0;">Spectral Signature Principles</h4>
-                <p style="font-size: 0.88rem; line-height: 1.5; color: #D3E0D8;">
-                    <b>Chlorophyll Absorption:</b> Healthy photosynthetic vegetation strongly absorbs visible blue (~490 nm) 
-                    and red (~665 nm) wavelengths while reflecting green (~560 nm).
-                </p>
-                <p style="font-size: 0.88rem; line-height: 1.5; color: #D3E0D8;">
-                    <b>Near-Infrared Plateau:</b> The internal mesophyll cell structure of healthy leaves reflects up to 
-                    50% of incoming Near-Infrared radiation (B08: 842 nm). A sudden drop in B08 reflectance indicates canopy loss, 
-                    wilting, or defoliation.
-                </p>
-            </div>
-            """,
+            '<div class="tp-card" style="margin-top: 25px;">'
+            '<h4 style="color: #2A9D8F; margin-top: 0;">Spectral Signature Principles</h4>'
+            '<p style="font-size: 0.88rem; line-height: 1.5; color: #D3E0D8;">'
+            '<b>Chlorophyll Absorption:</b> Healthy photosynthetic vegetation strongly absorbs visible blue (~490 nm) '
+            'and red (~665 nm) wavelengths while reflecting green (~560 nm).'
+            '</p>'
+            '<p style="font-size: 0.88rem; line-height: 1.5; color: #D3E0D8;">'
+            '<b>Near-Infrared Plateau:</b> The internal mesophyll cell structure of healthy leaves reflects up to '
+            '50% of incoming Near-Infrared radiation (B08: 842 nm). A sudden drop in B08 reflectance indicates canopy loss, '
+            'wilting, or defoliation.'
+            '</p>'
+            '</div>',
             unsafe_allow_html=True,
         )
 
@@ -498,16 +490,17 @@ elif navigation == "3. Change Detection":
         )
 
         st.markdown("#### 🏷️ Change Legend")
-        legend_html = "<div style='display: flex; flex-direction: column; gap: 8px;'>"
+        legend_items = []
         for cid in [1, 2, 3, 4, 5]:
             meta_c = CHANGE_CLASSES[cid]
-            legend_html += f"""
-            <div style='display: flex; align-items: center; gap: 10px;'>
-                <div style='width: 18px; height: 18px; border-radius: 4px; background: {meta_c['color']};'></div>
-                <div style='font-size: 0.85rem;'><b>{meta_c['name']}</b>: <span style='color: #A3B899;'>{meta_c['description']}</span></div>
-            </div>
-            """
-        legend_html += "</div>"
+            legend_items.append(
+                f"<div style='display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px;'>"
+                f"<div style='width: 16px; height: 16px; border-radius: 4px; background: {meta_c['color']}; flex-shrink: 0; margin-top: 3px;'></div>"
+                f"<div style='font-size: 0.85rem; line-height: 1.4;'><b>{meta_c['name']}</b>: "
+                f"<span style='color: #A3B899;'>{meta_c['description']}</span></div>"
+                f"</div>"
+            )
+        legend_html = f"<div style='display: flex; flex-direction: column; gap: 2px; margin-top: 8px;'>{''.join(legend_items)}</div>"
         st.markdown(legend_html, unsafe_allow_html=True)
 
     st.markdown("---")

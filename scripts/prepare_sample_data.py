@@ -5,8 +5,8 @@ Produces 5-band GeoTIFFs (B02, B03, B04, B08, SCL) for:
 2. Mau Forest, Kenya (Degradation & Regrowth - 2019 vs 2024)
 """
 
-import os
 from pathlib import Path
+
 import numpy as np
 import rasterio
 from rasterio.transform import from_origin
@@ -97,15 +97,32 @@ def create_rondonia_pair(output_dir: Path):
         t2_blue[by - 1:by + 2, 25:90] = 0.12
         t2_scl[by - 1:by + 2, 25:90] = 5
 
-        # Large cleared parcel blocks along secondary roads
+        # Realistic agricultural clearings along secondary roads with natural perimeter boundaries
         for px, py, pw, ph in [(100, by - 12, 45, 25), (35, by - 14, 40, 28)]:
             if 0 <= py < height - ph and 0 <= px < width - pw:
-                # Clear-cut bare soil / degraded pasture: Low NIR (~0.14-0.18), High Red (~0.16-0.22) -> NDVI ~ 0.0-0.15
-                t2_nir[py:py + ph, px:px + pw] = np.random.normal(0.16, 0.02, (ph, pw))
-                t2_red[py:py + ph, px:px + pw] = np.random.normal(0.18, 0.02, (ph, pw))
-                t2_green[py:py + ph, px:px + pw] = np.random.normal(0.13, 0.015, (ph, pw))
-                t2_blue[py:py + ph, px:px + pw] = np.random.normal(0.10, 0.015, (ph, pw))
-                t2_scl[py:py + ph, px:px + pw] = 5
+                # Add organic boundary noise with edge perturbation
+                yy, xx = np.ogrid[:ph, :pw]
+                norm_y = (yy / ph) * 2.0 - 1.0
+                norm_x = (xx / pw) * 2.0 - 1.0
+                perimeter_noise = np.random.normal(0, 0.15, (ph, pw))
+                parcel_mask = ((np.abs(norm_x)**3.2 + np.abs(norm_y)**3.2) + perimeter_noise) <= 0.95
+
+                nir_patch = np.random.normal(0.16, 0.02, (ph, pw)).astype(np.float32)
+                red_patch = np.random.normal(0.18, 0.02, (ph, pw)).astype(np.float32)
+                green_patch = np.random.normal(0.13, 0.015, (ph, pw)).astype(np.float32)
+                blue_patch = np.random.normal(0.10, 0.015, (ph, pw)).astype(np.float32)
+
+                sub_nir = t2_nir[py:py + ph, px:px + pw]
+                sub_red = t2_red[py:py + ph, px:px + pw]
+                sub_green = t2_green[py:py + ph, px:px + pw]
+                sub_blue = t2_blue[py:py + ph, px:px + pw]
+                sub_scl = t2_scl[py:py + ph, px:px + pw]
+
+                sub_nir[parcel_mask] = nir_patch[parcel_mask]
+                sub_red[parcel_mask] = red_patch[parcel_mask]
+                sub_green[parcel_mask] = green_patch[parcel_mask]
+                sub_blue[parcel_mask] = blue_patch[parcel_mask]
+                sub_scl[parcel_mask] = 5
 
     # Keep river intact in T2
     for y in range(height):

@@ -35,10 +35,13 @@ def get_wgs84_bounds(profile: dict[str, Any]) -> tuple[list[float], list[float],
     if crs is not None:
         crs_obj = CRS.from_user_input(crs)
         if not crs_obj.is_geographic:
-            # Transform from native projected CRS to EPSG:4326 (lat, lon)
+            # Transform all 4 corners from native projected CRS to EPSG:4326 (lat, lon)
             transformer = Transformer.from_crs(crs_obj, "EPSG:4326", always_xy=True)
-            lon_min, lat_min = transformer.transform(min_x, min_y)
-            lon_max, lat_max = transformer.transform(max_x, max_y)
+            corner_xs = [min_x, min_x, max_x, max_x]
+            corner_ys = [min_y, max_y, min_y, max_y]
+            lons, lats = transformer.transform(corner_xs, corner_ys)
+            lat_min, lat_max = float(min(lats)), float(max(lats))
+            lon_min, lon_max = float(min(lons)), float(max(lons))
         else:
             lon_min, lat_min = min_x, min_y
             lon_max, lat_max = max_x, max_y
@@ -57,19 +60,29 @@ def get_wgs84_bounds(profile: dict[str, Any]) -> tuple[list[float], list[float],
 def create_interactive_map(
     center_lat_lon: list[float],
     zoom_start: int = 14,
-    basemap: str = "CartoDB dark_matter",
+    basemap: str = "OpenStreetMap",
 ) -> folium.Map:
-    """Create a standardized base Folium map."""
-    m = folium.Map(
-        location=center_lat_lon,
-        zoom_start=zoom_start,
-        tiles=basemap,
-        control_scale=True,
-    )
-    # Add Esri World Imagery satellite basemap as optional layer
+    """Create a standardized base Folium map using public keyless tile providers."""
+    try:
+        m = folium.Map(
+            location=center_lat_lon,
+            zoom_start=zoom_start,
+            tiles=basemap,
+            control_scale=True,
+        )
+    except Exception:  # noqa: BLE001
+        # Graceful fallback to default OpenStreetMap if a custom provider is unavailable
+        m = folium.Map(
+            location=center_lat_lon,
+            zoom_start=zoom_start,
+            tiles="OpenStreetMap",
+            control_scale=True,
+        )
+
+    # Add Esri World Imagery satellite basemap as optional keyless layer
     folium.TileLayer(
         tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attr="Esri World Imagery",
+        attr="Esri, Maxar, Earthstar Geographics",
         name="Satellite Basemap (Esri)",
         overlay=False,
         control=True,
